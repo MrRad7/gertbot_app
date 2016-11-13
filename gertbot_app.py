@@ -1,4 +1,5 @@
 #!/home/pi/gertbot_app/bin/python3
+##!/usr/bin/python3
 
 # The modules here were taken fromt he code that came with the Gertbot.
 #
@@ -7,10 +8,12 @@
 #
 
 import time,sys
+import os
 import datetime
 import signal
 import gertbot as gb
 import json
+import psutil
 import pika  #for rabbitMQ
 
 DEBUG = 1
@@ -20,6 +23,8 @@ board = 0
 
 # channel is global
 channel = 0
+
+rabbitmq_pid_file = "/var/run/rabbitmq/pid"
 
 ERROR_CODE = -1
 
@@ -101,7 +106,7 @@ endstop_string = ["Off", "Low", "High"]
 # Start PWM & DC brushed   
 #
 ########  
-def start_pwm_brushed (board=0, channel=0) :
+def start_pwm_brushed (board=0, channel=0, direction='MOVE_B') :
     #output("Test PWM brushed on board %d\n" % (board))
     #output("Disable short protection for all four channels!!\n")
 
@@ -115,7 +120,11 @@ def start_pwm_brushed (board=0, channel=0) :
         return ERROR_CODE
 
     if 'Stop' not in status:
-        output("Motor is already moving, %s" % (status))
+        output("Motor is already moving - ignoring, %s" % (status))
+        return 0
+
+    if (('MOVE_B' not in direction) and ('MOVE_A' not in direction)):
+        output("Unknown direction given, %s" % (direction))
         return 0
     
     # Set channel for brushed and start motor 
@@ -359,7 +368,11 @@ def get_motor_config(board=0, channel=0) :
 
 
 def get_motor_status(board=0, channel=0) :
-    motor_status_list = gb.get_motor_status(board,channel)
+    try:
+        motor_status_list = gb.get_motor_status(board,channel)
+    except:
+        output("Cannot get motor_list_status!\n")
+        return -1
 
     # motor status :    0 = off
     #                   1 = MOVE_A backwards
@@ -434,10 +447,14 @@ def check_request(body):
         result = read_error(gertbot_board)
         return result
     
-    if my_command == "start":
-        result = start_pwm_brushed(gertbot_board,gertbot_channel)
+    if my_command == "start_a":
+        result = start_pwm_brushed(gertbot_board,gertbot_channel, 'MOVE_A')
         return result
 
+    if my_command == "start_b":
+        result = start_pwm_brushed(gertbot_board,gertbot_channel,'MOVE_B')
+        return result
+    
     if my_command == "stop":
         result = stop_pwm_brushed(gertbot_board,gertbot_channel)
         return result
@@ -525,6 +542,26 @@ motor_status = get_motor_status(gertbot_board, gertbot_channel)
 output("Motor status: %s \n" % (motor_status))
 
 #stop_pwm_brushed()
+
+# Make sure that RabbitMQ is running!
+if os.path.exists(rabbitmq_pid_file):
+        try:
+            f = open(rabbitmq_pid_file, 'r')    
+        except:
+            output("Cannot open pid file for RabbitMQ (%s), exiting." % (rabbitmq_pid_file))
+            exit()
+        else:
+            rabbitmq_pid = f.read()
+            f.close()
+            #output("PID=%s" % (rabbitmq_pid))
+            if not psutil.pid_exists(int(rabbitmq_pid)):
+                output("RabbitMQ-server doesn't seem to be running, exiting.")
+                exit()
+else:
+    output("PID file does not exist (%s), exiting." % (rabbitmq_pid_file))
+    exit()
+
+#output("PID=%s\n" % (rabbitmq_pid))
 
 # Configure RabbitMQ event loop
 connection = pika.BlockingConnection(pika.ConnectionParameters(

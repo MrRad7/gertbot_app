@@ -41,7 +41,7 @@ gertbot_rpc = GertbotRpcClient()
 
 print(" [x] Requesting GertBot(status)")
 
-command = "config" #start stop status config version read_error emergency_stop
+command = "config" #start_a start_b stop status config version read_error emergency_stop
 #command_json = json.dumps([{"command" : command}], sort_keys=True)
 command_json = json.dumps({"command" : command}, sort_keys=True)
 
