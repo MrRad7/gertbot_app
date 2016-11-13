@@ -1,0 +1,28 @@
+# copy this to /lib/systemd/system
+# systemctl enable gertbot_app.service
+# systemctl start gerbot_app.service
+# systemctl status gertbot_app.service
+[Unit]
+Description=Gertbot App Server
+#After=multi-user.target
+#After=syslog.target
+After=syslog.target multi-user.target rabbitmq-server.service
+
+[Service]
+Type=idle
+User=root
+#Group=root
+#GuessMainPID=no
+StandardInput=null
+WorkingDirectory=/home/pi/gertbot_app
+ExecStart=/home/pi/gertbot_app/gertbot_app.py 
+Restart=always
+SyslogIdentifier=gertbot_app
+StandardError=syslog
+StandardOutput=syslog
+Environment=NODE_ENV=production
+
+[Install]
+#WantedBy=multi-user.target
+WantedBy=defalt.target
+Alias=gertbot_app.service
